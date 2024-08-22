@@ -2,111 +2,142 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+from typing import Any
 
 from vconnex.device import VconnexDevice, VconnexDeviceManager
 
 from homeassistant.components.binary_sensor import (
-    DEVICE_CLASS_SAFETY,
+    BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, DispatcherSignal
-from .entity import EntityDescListResolver, EntityDescResolver, VconnexEntity
+from .const import DOMAIN, CommandName, DispatcherSignal
+from .entity import VconnexEntity, VconnexParamDescription
 from .vconnex_wrap import HomeAssistantVconnexData
 
+_KEY__ENTITY_CONFIGS = "entity_configs"
+_KEY__PARAM_DESC = "param_desc"
+_KEY__ENTITY_DESC = "entity_desc"
+_KEY__DEVICE_CLASS = "device_class"
 
-class ParamInfoExt(SimpleNamespace):
-    """Param Infomation Extend."""
 
-    device_class: str
-
-
-ENTITY_DESC_EXT_MAP = {
-    3043: [
-        BinarySensorEntityDescription(
-            key="eleak",
-            device_class=DEVICE_CLASS_SAFETY,
-        ),
-    ], 
-    3052: [
-        BinarySensorEntityDescription(
-            key="eleak",
-            device_class=DEVICE_CLASS_SAFETY,
-        ),
-    ]
+_ENTITY_CONFIG_MAP = {
+    3024: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.PROBLEM,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("waterLeak"),
+            }
+        ]
+    },
+    3027: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.GAS,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("gasLeak"),
+            }
+        ]
+    },
+    3028: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.SMOKE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("smokeAlarm"),
+            }
+        ]
+    },
+    3029: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.MOTION,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("motion"),
+            }
+        ]
+    },
+    3043: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.SAFETY,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("eleak"),
+            }
+        ]
+    },
+    3049: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.SMOKE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("smokeAlarm"),
+            }
+        ]
+    },
+    3052: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.SAFETY,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("eleak"),
+            }
+        ]
+    },
+    3056: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.SMOKE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("smokeAlarm"),
+            }
+        ]
+    },
+    3057: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.SMOKE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("smokeAlarm"),
+            }
+        ]
+    },
+    3066: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.DOOR,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("door"),
+            }
+        ]
+    },
+    3067: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: BinarySensorDeviceClass.MOTION,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("motion"),
+            }
+        ]
+    },
 }
-
-
-def fix_entity_desc_map():
-    """Convert ENTITY_DESC_EXT_MAP object."""
-    for device_type, desc_list in ENTITY_DESC_EXT_MAP.items():
-        desc_list_map = {desc.key: desc for desc in desc_list}
-        ENTITY_DESC_EXT_MAP[device_type] = desc_list_map
-
-
-fix_entity_desc_map()
-
-
-@callback
-def append_entity_desc_ext(param_dict: dict, device: VconnexDevice) -> dict:
-    """Append addition param info to entity description."""
-    key = param_dict.get("key")
-    if (device_type := int(device.deviceTypeCode)) in ENTITY_DESC_EXT_MAP:
-        entity_desc_ext = ENTITY_DESC_EXT_MAP[device_type].get(key)
-        if entity_desc_ext is not None:
-            for attr in vars(entity_desc_ext):
-                attr_val = getattr(entity_desc_ext, attr)
-                if attr_val is not None:
-                    param_dict[attr] = attr_val
-            return param_dict
-    return None
-
-
-DEVICE_TYPE_SET: set[int] = set(ENTITY_DESC_EXT_MAP.keys())
-DEVICE_PARAM_TYPE_SET: set[int] = {}
-ENTITY_DESC_RESOLVER = EntityDescResolver.of(
-    BinarySensorEntityDescription
-).with_additional_param_func(append_entity_desc_ext)
-
-ENTITY_DESC_LIST_RESOLVER_LIST = [
-    EntityDescListResolver(DEVICE_TYPE_SET, DEVICE_PARAM_TYPE_SET, ENTITY_DESC_RESOLVER)
-]
-
-
-class VconnexBinarySensorEntity(VconnexEntity, BinarySensorEntity):
-    """Vconnex Binary Sensor Device."""
-
-    def __init__(
-        self,
-        vconnex_device: VconnexDevice,
-        device_manager: VconnexDeviceManager,
-        description: BinarySensorEntityDescription,
-    ) -> None:
-        """Create Vconnex Binary Sensor Entity object."""
-        super().__init__(
-            vconnex_device=vconnex_device,
-            device_manager=device_manager,
-            description=description,
-        )
-        self._attr_unique_id = f"{super().unique_id}.{description.key}"
-        self.entity_id = self._attr_unique_id
-
-    @property
-    def is_on(self) -> bool:
-        """Return true if the binary sensor is on."""
-        return self.get_data(
-            param=self.entity_description.key, converter=lambda val, entity: val != 0
-        )
-
-
-TargetEntity = VconnexBinarySensorEntity
 
 
 async def async_setup_entry(
@@ -119,21 +150,66 @@ async def async_setup_entry(
     @callback
     def on_device_added(device_ids: list[str]) -> None:
         """Device added callback."""
-        entities: list[Entity] = []
+        entities: list[VconnexEntity] = []
         for device_id in device_ids:
-            device = device_manager.device_map[device_id]
-            for description_list_resolver in ENTITY_DESC_LIST_RESOLVER_LIST:
-                description_list = description_list_resolver.from_device(device)
-                if len(description_list) > 0:
-                    for description in description_list:
-                        entities.append(
-                            TargetEntity(
-                                vconnex_device=device,
-                                device_manager=device_manager,
-                                description=description,
-                            )
-                        )
-        async_add_entities(entities)
+            if (device := device_manager.get_device(device_id)) is not None:
+                if device.deviceTypeCode not in _ENTITY_CONFIG_MAP:
+                    continue
 
-    async_dispatcher_connect(hass, DispatcherSignal.DEVICE_ADDED, on_device_added)
+                entity_configs = list[dict[str, Any]](
+                    _ENTITY_CONFIG_MAP[device.deviceTypeCode].get(_KEY__ENTITY_CONFIGS)
+                )
+                for entity_config in entity_configs:
+                    param_desc: VconnexParamDescription = entity_config.get(
+                        _KEY__PARAM_DESC
+                    )
+                    if (param_info := param_desc.find_device_param(device)) is None:
+                        continue
+
+                    entity_desc_dict = {
+                        **entity_config.get(_KEY__ENTITY_DESC),
+                        "key": f"{device.deviceId}.{param_desc.native_param}",
+                        "name": param_info.get("name"),
+                    }
+
+                    entities.append(
+                        VconnexBinarySensorEntity(
+                            vconnex_device=device,
+                            device_manager=device_manager,
+                            description=BinarySensorEntityDescription(
+                                **entity_desc_dict
+                            ),
+                            param_desc=param_desc,
+                        )
+                    )
+        if len(entities) > 0:
+            async_add_entities(entities)
+
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, DispatcherSignal.DEVICE_ADDED, on_device_added)
+    )
     on_device_added(device_ids=device_manager.device_map.keys())
+
+
+class VconnexBinarySensorEntity(VconnexEntity, BinarySensorEntity):
+    """Vconnex Binary Sensor Device."""
+
+    def __init__(
+        self,
+        vconnex_device: VconnexDevice,
+        device_manager: VconnexDeviceManager,
+        description: BinarySensorEntityDescription,
+        param_desc: VconnexParamDescription,
+    ) -> None:
+        """Create Vconnex Binary Sensor Entity object."""
+        super().__init__(
+            vconnex_device=vconnex_device,
+            device_manager=device_manager,
+            description=description,
+        )
+        self.param_desc = param_desc
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the binary sensor is on."""
+        return self.get_param_value(CommandName.GET_DATA, self.param_desc) != 0

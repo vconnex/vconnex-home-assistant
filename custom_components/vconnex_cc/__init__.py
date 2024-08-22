@@ -1,4 +1,5 @@
 """The Vconnex integration."""
+
 from __future__ import annotations
 
 import logging
@@ -7,17 +8,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, PLATFORMS
-from .vconnex_wrap import init_sdk, release_sdk
+from .vconnex_wrap import sdk_init, sdk_release
 
-LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Async setup hass config entry."""
-
     hass.data.setdefault(DOMAIN, {})
-
-    vconnex_data = await init_sdk(hass, entry)
+    vconnex_data = await sdk_init(hass, entry)
     if vconnex_data is None:
         return False
 
@@ -31,6 +30,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         vconnex_data = hass.data[DOMAIN].pop(entry.entry_id)
-        release_sdk(vconnex_data)
-
+        sdk_release(vconnex_data)
     return unload_ok

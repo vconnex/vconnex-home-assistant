@@ -1,4 +1,5 @@
 """The Vconnex wrap."""
+
 from __future__ import annotations
 
 import logging
@@ -9,12 +10,13 @@ from vconnex.device import VconnexDevice, VconnexDeviceListener, VconnexDeviceMa
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import dispatcher_send
 
 from .const import (
     CONF_CLIENT_ID,
     CONF_CLIENT_SECRET,
+    CONF_ENDPOINT,
     DEFAULT_ENDPOINT,
     DOMAIN,
     PROJECT_CODE,
@@ -30,21 +32,22 @@ class HomeAssistantVconnexData(NamedTuple):
 
     config_data: dict[str, Any]
     device_manager: VconnexDeviceManager
+    device_listener: DeviceListener
 
 
-async def init_sdk(
+async def sdk_init(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> HomeAssistantVconnexData | None:
     """Init vconnex sdk."""
     api = VconnexAPI(
-        endpoint=DEFAULT_ENDPOINT,
+        endpoint=entry.data.get(CONF_ENDPOINT, DEFAULT_ENDPOINT),
         client_id=entry.data[CONF_CLIENT_ID],
         client_secret=entry.data[CONF_CLIENT_SECRET],
         project_code=PROJECT_CODE,
     )
 
     if not await hass.async_add_executor_job(api.is_valid):
-        LOGGER.error("Cannot connect!")
+        LOGGER.error("Could not connect with client_id: %s", entry.data[CONF_CLIENT_ID])
         return None
 
     device_manager = VconnexDeviceManager(api)
@@ -62,20 +65,28 @@ async def init_sdk(
         device_manager,
     )
 
-    device_manager.add_device_listener(DeviceListener(hass, device_manager))
+    device_listener = DeviceListener(hass, device_manager)
+    device_manager.add_device_listener(device_listener)
+    device_manager.add_device_data_listener(device_listener.on_device_data_update)
 
     config_data = dict(entry.data)
     config_data.pop(CONF_CLIENT_SECRET, None)
 
     return HomeAssistantVconnexData(
-        config_data=config_data, device_manager=device_manager
+        config_data=config_data,
+        device_manager=device_manager,
+        device_listener=device_listener,
     )
 
 
-def release_sdk(data: HomeAssistantVconnexData):
+def sdk_release(data: HomeAssistantVconnexData):
     """Release Vconnex sdk."""
     try:
         data.device_manager.release()
+        data.device_manager.remove_device_listener(data.device_listener)
+        data.device_manager.remove_device_data_listener(
+            data.device_listener.on_device_data_update
+        )
     except Exception:  # pylint: disable=broad-except
         LOGGER.exception("Oops, something went wrong!")
 
@@ -126,10 +137,16 @@ class DeviceListener(VconnexDeviceListener):
             self.hass, f"{DispatcherSignal.DEVICE_UPDATED}.{new_device.deviceId}"
         )
 
+    def on_device_data_update(self, device_id: str, message_dict: dict[str, Any]):
+        """On device data update callback."""
+        dispatcher_send(
+            self.hass, f"{DispatcherSignal.DEVICE_DATA_UPDATED}.{device_id}"
+        )
+
     @callback
     async def remove_device_entry(self, device: VconnexDevice):
         """Remove device entry."""
-        device_reg = device_registry.async_get(self.hass)
+        device_reg = dr.async_get(self.hass)
         device_entry = device_reg.async_get_device(
             identifiers={(DOMAIN, device.deviceId)}
         )
