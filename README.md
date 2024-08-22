@@ -18,24 +18,28 @@ This is a custom component to allow control Vconnex smart devices in [HomeAssist
 
 ### Install using HACS (recomended)
 
-**1.** [HACS Install](https://hacs.xyz/docs/installation/installation/)
+**1.** [Download HACS](https://hacs.xyz/docs/use/download/download/)
 
-**2.** [HACS Initial Configuration](https://hacs.xyz/docs/configuration/basic)
+**2.** [Setup the HACS integration](https://hacs.xyz/docs/use/configuration/basic/#setting-up-the-hacs-integration)
 
-**3.** HACS -> Integrations -> ... -> Custom repositories 
+**3.** **Install custom repository**
+
+HACS -> Integrations -> ... -> Custom repositories 
 ![Install custom repository](https://github.com/vconnex/asset/raw/master/vconnex-home-assistant/img/hacs-install-custom.png)
 
-**4.** Input the vconnex-home-assistant GitHub URL: **https://github.com/vconnex/vconnex-home-assistant** and select **Integration** as the Category type,  then click **ADD**.
+**4.** **Download custom components: Vconnex CC**
+
+**-** Input the vconnex-home-assistant GitHub URL: **https://github.com/vconnex/vconnex-home-assistant** and select **Integration** as the Category type,  then click **ADD**.
+
 ![Add integration](https://github.com/vconnex/asset/raw/master/vconnex-home-assistant/img/add-custom-repo.png)
 
-**5.** Click **DOWNLOAD**
+**-** Click **DOWNLOAD**
+
 ![Download](https://github.com/vconnex/asset/raw/master/vconnex-home-assistant/img/install-custom-component.png)
 
-**6.** Restart Home Assistant
-Configuration -> Server Controls -> RESTART
-![Restart HASS 1](https://github.com/vconnex/asset/raw/master/vconnex-home-assistant/img/restart-hass-1.png)
+**-** Restart Home Assistant: Developer tools -> RESTART
 
-![Restart HASS 2](https://github.com/vconnex/asset/raw/master/vconnex-home-assistant/img/restart-hass-2.png)
+![Restart HASS](https://github.com/vconnex/asset/raw/master/vconnex-home-assistant/img/restart-hass-new.png)
 
 
 ### Install manually
