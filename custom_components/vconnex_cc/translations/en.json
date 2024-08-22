@@ -5,16 +5,17 @@
         },
         "error": {
             "cannot_connect": "Failed to connect",
-            "invalid_credentials": "Invalid credentials",
             "credentials_used": "Credentials already in use",
+            "invalid_credentials": "Invalid credentials",
+            "invalid_endpoint": "Invalid endpoint",
             "unknown": "Unexpected error"
         },
         "step": {
             "user": {
                 "data": {
-                    "endpoint": "Endpoint",
                     "client_id": "Client ID",
-                    "client_secret": "Client Secret"
+                    "client_secret": "Client Secret",
+                    "endpoint": "Endpoint"
                 }
             }
         }

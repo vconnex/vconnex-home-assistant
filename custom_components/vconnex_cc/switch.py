@@ -8,7 +8,7 @@ from typing import Any
 from vconnex.device import VconnexDevice, VconnexDeviceManager
 
 from homeassistant.components.switch import (
-    DEVICE_CLASS_SWITCH,
+    SwitchDeviceClass,
     SwitchEntity,
     SwitchEntityDescription,
 )
@@ -17,59 +17,199 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, CommandName, DispatcherSignal, ParamType
-from .entity import EntityDescListResolver, EntityDescResolver, VconnexEntity
+from .const import DOMAIN, CommandName, DispatcherSignal
+from .entity import VconnexEntity, VconnexParamDescription
 from .vconnex_wrap import HomeAssistantVconnexData
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
+_KEY__ENTITY_CONFIGS = "entity_configs"
+_KEY__PARAM_DESC = "param_desc"
+_KEY__ENTITY_DESC = "entity_desc"
+_KEY__DEVICE_CLASS = "device_class"
 
-DEVICE_TYPE_SET = {3010, 3011, 3012, 3015, 3016, 3017, 3018, 3043, 3052}
-DEVICE_PARAM_TYPE_SET = {ParamType.ON_OFF}
-ENTITY_DESC_RESOLVER = EntityDescResolver.of(
-    SwitchEntityDescription
-).with_additional_param_value({"device_class": DEVICE_CLASS_SWITCH})
-
-ENTITY_DESC_LIST_RESOLVER_LIST = [
-    EntityDescListResolver(DEVICE_TYPE_SET, DEVICE_PARAM_TYPE_SET, ENTITY_DESC_RESOLVER)
-]
-
-
-class VconnexSwitchEntity(VconnexEntity, SwitchEntity):
-    """Vconnex Switch Device."""
-
-    def __init__(
-        self,
-        vconnex_device: VconnexDevice,
-        device_manager: VconnexDeviceManager,
-        description: SwitchEntityDescription,
-    ) -> None:
-        """Create Vconnex Switch Entity object."""
-        super().__init__(
-            vconnex_device=vconnex_device,
-            device_manager=device_manager,
-            description=description,
-        )
-        self._attr_unique_id = f"{super().unique_id}.{description.key}"
-        self.entity_id = self._attr_unique_id
-
-    @property
-    def is_on(self) -> bool:
-        """Return true if switch is on."""
-        return self.get_data(
-            param=self.entity_description.key, converter=lambda val, entity: val != 0
-        )
-
-    def turn_on(self, **kwargs: Any) -> None:
-        """Turn the switch on."""
-        self._send_command("CmdSetData", {self.entity_description.key: 1})
-
-    def turn_off(self, **kwargs: Any) -> None:
-        """Turn the switch off."""
-        self._send_command(CommandName.SET_DATA, {self.entity_description.key: 0})
-
-
-TargetEntity = VconnexSwitchEntity
+_ENTITY_CONFIG_MAP = {
+    3010: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("vconnex_switch_3_1"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("vconnex_switch_3_2"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("vconnex_switch_3_3"),
+            },
+        ]
+    },
+    3012: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("vconnex_switch_1_1"),
+            },
+        ]
+    },
+    3013: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("vconnex_switch_2_1"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("vconnex_switch_2_2"),
+            },
+        ]
+    },
+    3015: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+        ]
+    },
+    3016: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_2"),
+            },
+        ]
+    },
+    3017: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_2"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_3"),
+            },
+        ]
+    },
+    3018: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_2"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_3"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_4"),
+            },
+        ]
+    },
+    3043: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+        ]
+    },
+    3052: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+        ]
+    },
+    3071: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+        ]
+    },
+    3072: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_2"),
+            },
+        ]
+    },
+    3076: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SwitchDeviceClass.SWITCH,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription("switch_1"),
+            },
+        ]
+    },
+}
 
 
 async def async_setup_entry(
@@ -86,20 +226,70 @@ async def async_setup_entry(
         """Device added callback."""
         entities: list[VconnexEntity] = []
         for device_id in device_ids:
-            device = device_manager.device_map.get(device_id)
-            if device is not None:
-                for description_list_resolver in ENTITY_DESC_LIST_RESOLVER_LIST:
-                    description_list = description_list_resolver.from_device(device)
-                    if len(description_list) > 0:
-                        for description in description_list:
-                            entities.append(
-                                TargetEntity(
-                                    vconnex_device=device,
-                                    device_manager=device_manager,
-                                    description=description,
-                                )
-                            )
-        async_add_entities(entities)
+            if (device := device_manager.get_device(device_id)) is not None:
+                if device.deviceTypeCode not in _ENTITY_CONFIG_MAP:
+                    continue
 
-    async_dispatcher_connect(hass, DispatcherSignal.DEVICE_ADDED, on_device_added)
+                entity_configs = list[dict[str, Any]](
+                    _ENTITY_CONFIG_MAP[device.deviceTypeCode].get(_KEY__ENTITY_CONFIGS)
+                )
+                for entity_config in entity_configs:
+                    param_desc: VconnexParamDescription = entity_config.get(
+                        _KEY__PARAM_DESC
+                    )
+                    if (param_info := param_desc.find_device_param(device)) is None:
+                        continue
+
+                    entity_desc_dict = {
+                        **entity_config.get(_KEY__ENTITY_DESC),
+                        "key": f"{device.deviceId}.{param_desc.native_param}",
+                        "name": param_info.get("name"),
+                    }
+
+                    entities.append(
+                        VconnexSwitchEntity(
+                            vconnex_device=device,
+                            device_manager=device_manager,
+                            description=SwitchEntityDescription(**entity_desc_dict),
+                            param_desc=param_desc,
+                        )
+                    )
+        if len(entities) > 0:
+            async_add_entities(entities)
+
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, DispatcherSignal.DEVICE_ADDED, on_device_added)
+    )
     on_device_added(device_ids=device_manager.device_map.keys())
+
+
+class VconnexSwitchEntity(VconnexEntity, SwitchEntity):
+    """Vconnex Switch Device."""
+
+    def __init__(
+        self,
+        vconnex_device: VconnexDevice,
+        device_manager: VconnexDeviceManager,
+        description: SwitchEntityDescription,
+        param_desc: VconnexParamDescription,
+    ) -> None:
+        """Create Vconnex Switch Entity object."""
+        super().__init__(
+            vconnex_device=vconnex_device,
+            device_manager=device_manager,
+            description=description,
+        )
+        self.param_desc = param_desc
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if switch is on."""
+        return self.get_param_value(CommandName.GET_DATA, self.param_desc) != 0
+
+    def turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        self._send_command(CommandName.SET_DATA, {self.param_desc.native_param: 1})
+
+    def turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        self._send_command(CommandName.SET_DATA, {self.param_desc.native_param: 0})

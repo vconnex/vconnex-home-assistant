@@ -1,0 +1,15 @@
+diff --git a/custom_components/vconnex_cc/config_flow.py b/custom_components/vconnex_cc/config_flow.py
+index 10c9992..24fc5a1 100644
+--- a/custom_components/vconnex_cc/config_flow.py
++++ b/custom_components/vconnex_cc/config_flow.py
+@@ -129,6 +129,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+             step_id="user",
+             data_schema=vol.Schema(
+                 {
++                    vol.Required(
++                        CONF_ENDPOINT,
++                        default=DEFAULT_ENDPOINT,
++                    ): str,
+                     vol.Required(
+                         CONF_CLIENT_ID, default=user_input.get(CONF_CLIENT_ID)
+                     ): str,

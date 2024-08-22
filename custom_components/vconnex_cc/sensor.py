@@ -3,160 +3,349 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+import datetime
 import logging
 from typing import Any
 
 from vconnex.device import VconnexDevice, VconnexDeviceManager
 
 from homeassistant.components.sensor import (
-    STATE_CLASS_MEASUREMENT,
-    STATE_CLASS_TOTAL_INCREASING,
+    SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
+    SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    DEVICE_CLASS_CURRENT,
-    DEVICE_CLASS_ENERGY,
-    DEVICE_CLASS_POWER,
-    DEVICE_CLASS_VOLTAGE,
-    ELECTRIC_CURRENT_AMPERE,
-    ELECTRIC_POTENTIAL_VOLT,
-    ENERGY_KILO_WATT_HOUR,
-    POWER_WATT,
+    LIGHT_LUX,
+    PERCENTAGE,
+    UnitOfElectricCurrent,
+    UnitOfElectricPotential,
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from .const import DOMAIN, DispatcherSignal, ParamType
-from .entity import EntityDescListResolver, EntityDescResolver, VconnexEntity
+from .const import DOMAIN, DispatcherSignal
+from .entity import VconnexEntity, VconnexParamDescription
 from .vconnex_wrap import HomeAssistantVconnexData
 
-LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
-class SensorEntityDescriptionExt(SensorEntityDescription):
-    """Extend description of sensor entity."""
+_KEY__ENTITY_CONFIGS = "entity_configs"
+_KEY__PARAM_DESC = "param_desc"
+_KEY__ENTITY_DESC = "entity_desc"
+_KEY__DEVICE_CLASS = "device_class"
+_KEY__STATE_CLASS = "state_class"
+_KEY__NATIVE_UNIT_OF_MEASUREMENT = "native_unit_of_measurement"
 
-    value_converter: Callable[[Any, VconnexEntity], Any] | None = None
-    extended_param: bool = False
-
-
-ENTITY_DESC_EXT_MAP = {
-    # Electric Meter
-    3009: [
-        SensorEntityDescriptionExt(
-            key="Current",
-            device_class=DEVICE_CLASS_CURRENT,
-            state_class=STATE_CLASS_MEASUREMENT,
-            native_unit_of_measurement=ELECTRIC_CURRENT_AMPERE,
-        ),
-        SensorEntityDescriptionExt(
-            key="Voltage",
-            device_class=DEVICE_CLASS_VOLTAGE,
-            state_class=STATE_CLASS_MEASUREMENT,
-            native_unit_of_measurement=ELECTRIC_POTENTIAL_VOLT,
-        ),
-        SensorEntityDescriptionExt(
-            key="Power",
-            device_class=DEVICE_CLASS_POWER,
-            state_class=STATE_CLASS_MEASUREMENT,
-            native_unit_of_measurement=POWER_WATT,
-        ),
-        SensorEntityDescriptionExt(
-            key="EnergyCount",
-            device_class=DEVICE_CLASS_ENERGY,
-            state_class=STATE_CLASS_TOTAL_INCREASING,
-            native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-        ),
-        SensorEntityDescriptionExt(
-            key="ExportEnergyCount",
-            device_class=DEVICE_CLASS_ENERGY,
-            state_class=STATE_CLASS_TOTAL_INCREASING,
-            native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-        ),
-        # extend param
-        SensorEntityDescriptionExt(
-            key="ConsumptionCountToday",
-            device_class=DEVICE_CLASS_ENERGY,
-            state_class=STATE_CLASS_MEASUREMENT,
-            native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-            extended_param=True,
-        ),
-        SensorEntityDescriptionExt(
-            key="ConsumptionCountThisMonth",
-            device_class=DEVICE_CLASS_ENERGY,
-            state_class=STATE_CLASS_MEASUREMENT,
-            native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-            extended_param=True,
-        ),
-        SensorEntityDescriptionExt(
-            key="ConsumptionCostThisMonth",
-            state_class=STATE_CLASS_MEASUREMENT,
-            extended_param=True,
-        ),
-        SensorEntityDescriptionExt(
-            key="ExportCountToday",
-            device_class=DEVICE_CLASS_ENERGY,
-            state_class=STATE_CLASS_MEASUREMENT,
-            native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-            extended_param=True,
-        ),
-        SensorEntityDescriptionExt(
-            key="ExportCountThisMonth",
-            device_class=DEVICE_CLASS_ENERGY,
-            state_class=STATE_CLASS_MEASUREMENT,
-            native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
-            extended_param=True,
-        ),
-        SensorEntityDescriptionExt(
-            key="ExportCostThisMonth",
-            state_class=STATE_CLASS_MEASUREMENT,
-            extended_param=True,
-        ),
-    ],
+_ENTITY_CONFIG_MAP = {
+    3009: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.CURRENT,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfElectricCurrent.AMPERE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="Current"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.VOLTAGE,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfElectricPotential.VOLT,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="Voltage"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.POWER,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfPower.WATT,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="Power"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="EnergyCount"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(
+                    native_param="ExportEnergyCount"
+                ),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(
+                    native_param="ConsumptionCountToday", extended_param=True
+                ),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(
+                    native_param="ConsumptionCountThisMonth", extended_param=True
+                ),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(
+                    native_param="ConsumptionCostThisMonth", extended_param=True
+                ),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(
+                    native_param="ExportCountToday", extended_param=True
+                ),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(
+                    native_param="ExportCountThisMonth", extended_param=True
+                ),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(
+                    native_param="ExportCostThisMonth", extended_param=True
+                ),
+            },
+        ]
+    },
+    3020: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.TEMPERATURE,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfTemperature.CELSIUS,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="temp"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.HUMIDITY,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: PERCENTAGE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="humi"),
+            },
+        ]
+    },
+    3029: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ILLUMINANCE,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: LIGHT_LUX,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="lux"),
+            },
+        ]
+    },
+    3049: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.BATTERY,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: PERCENTAGE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="battery"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.SIGNAL_STRENGTH,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="RSSI"),
+            },
+        ]
+    },
+    3056: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.BATTERY,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: PERCENTAGE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="battery"),
+            },
+        ]
+    },
+    3057: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.BATTERY,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: PERCENTAGE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="battery"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.SIGNAL_STRENGTH,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="RSSI"),
+            },
+        ]
+    },
+    3066: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.BATTERY,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: PERCENTAGE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="battery"),
+            },
+        ]
+    },
+    3067: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ILLUMINANCE,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: LIGHT_LUX,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="lux"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.BATTERY,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: PERCENTAGE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="battery"),
+            },
+        ]
+    },
+    3076: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.CURRENT,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfElectricCurrent.AMPERE,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="current"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.VOLTAGE,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfElectricPotential.VOLT,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="voltage"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.POWER,
+                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfPower.WATT,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="activepower"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
+                    _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
+                },
+                _KEY__PARAM_DESC: VconnexParamDescription(native_param="energy"),
+            },
+        ]
+    },
 }
 
 
-def fix_entity_desc_map():
-    """Convert ENTITY_DESC_EXT_MAP object."""
-    for device_type, desc_list in ENTITY_DESC_EXT_MAP.items():
-        desc_list_map = {desc.key: desc for desc in desc_list}
-        ENTITY_DESC_EXT_MAP[device_type] = desc_list_map
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    """Async setup Home Assistant entry."""
+    vconnex_data: HomeAssistantVconnexData = hass.data[DOMAIN][entry.entry_id]
+    device_manager = vconnex_data.device_manager
 
+    @callback
+    def on_device_added(device_ids: list[str]) -> None:
+        """Device added callback."""
+        entities: list[VconnexEntity] = []
+        for device_id in device_ids:
+            if (device := device_manager.get_device(device_id)) is not None:
+                if device.deviceTypeCode not in _ENTITY_CONFIG_MAP:
+                    continue
 
-fix_entity_desc_map()
+                entity_configs = list[dict[str, Any]](
+                    _ENTITY_CONFIG_MAP[device.deviceTypeCode].get(_KEY__ENTITY_CONFIGS)
+                )
+                for entity_config in entity_configs:
+                    param_desc: VconnexParamDescription = entity_config.get(
+                        _KEY__PARAM_DESC
+                    )
+                    if (param_info := param_desc.find_device_param(device)) is None:
+                        continue
 
+                    entity_desc_dict = {
+                        **entity_config.get(_KEY__ENTITY_DESC),
+                        "key": f"{device.deviceId}.{param_desc.native_param}",
+                        "name": param_info.get("name"),
+                    }
+                    entities.append(
+                        VconnexSensorEntity(
+                            vconnex_device=device,
+                            device_manager=device_manager,
+                            description=SensorEntityDescription(**entity_desc_dict),
+                            param_desc=param_desc,
+                        )
+                    )
+        if len(entities) > 0:
+            async_add_entities(entities)
 
-@callback
-def append_entity_desc_ext(param_dict: dict, device: VconnexDevice) -> dict:
-    """Append addition param info to entity description."""
-    key = param_dict.get("key")
-    device_type = int(device.deviceTypeCode)
-    if device_type in ENTITY_DESC_EXT_MAP:
-        entity_desc_ext = ENTITY_DESC_EXT_MAP[device_type].get(key)
-        if entity_desc_ext is not None:
-            for attr in vars(entity_desc_ext):
-                attr_val = getattr(entity_desc_ext, attr)
-                if attr_val is not None:
-                    param_dict[attr] = attr_val
-    return param_dict
-
-
-DEVICE_TYPE_SET: set[int] = set(ENTITY_DESC_EXT_MAP.keys())
-DEVICE_PARAM_TYPE_SET: set[int] = {ParamType.RAW_VALUE}
-ENTITY_DESC_RESOLVER = EntityDescResolver.of(
-    SensorEntityDescriptionExt
-).with_additional_param_func(append_entity_desc_ext)
-
-ENTITY_DESC_LIST_RESOLVER_LIST = [
-    EntityDescListResolver(DEVICE_TYPE_SET, DEVICE_PARAM_TYPE_SET, ENTITY_DESC_RESOLVER)
-]
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, DispatcherSignal.DEVICE_ADDED, on_device_added)
+    )
+    on_device_added(device_ids=device_manager.device_map.keys())
 
 
 class VconnexSensorEntity(VconnexEntity, SensorEntity):
@@ -166,7 +355,8 @@ class VconnexSensorEntity(VconnexEntity, SensorEntity):
         self,
         vconnex_device: VconnexDevice,
         device_manager: VconnexDeviceManager,
-        description: SensorEntityDescriptionExt,
+        description: SensorEntityDescription,
+        param_desc: VconnexParamDescription,
     ) -> None:
         """Create Vconnex Sensor Entity object."""
         super().__init__(
@@ -174,29 +364,24 @@ class VconnexSensorEntity(VconnexEntity, SensorEntity):
             device_manager=device_manager,
             description=description,
         )
-        self._attr_unique_id = f"{super().unique_id}.{description.key}"
-        self.entity_id = self._attr_unique_id
-
-        if (
-            hasattr(self.entity_description, "value_converter")
-            and self.entity_description.value_converter is not None
-        ):
-            self.value_converter = self.entity_description.value_converter
-        else:
-            self.value_converter = None
+        # self._attr_unit_of_measurement = description.native_unit_of_measurement
+        self.param_desc = param_desc
 
     @property
     def native_value(self) -> StateType:
         """Get native value of sensor."""
-        if self.entity_description.extended_param:
-            return self._get_extended_data(
-                self.entity_description.key, self.value_converter
-            )
+        return self.get_param_value(
+            "ExtendedDeviceData" if self.param_desc.extended_param else "CmdGetData",
+            self.param_desc,
+        )
 
-        return self.get_data(self.entity_description.key, self.value_converter)
+    @property
+    def last_reset(self) -> datetime.datetime | None:
+        """The time when an accumulating sensor was initialized."""
+        return None
 
     def _get_extended_data(
-        self, param, converter: Callable[[Any, VconnexEntity], Any] = None
+        self, param, converter: Callable[[Any, VconnexEntity], Any] | None = None
     ) -> Any:
         """Get data of ExtendedDeviceData message."""
         try:
@@ -212,39 +397,6 @@ class VconnexSensorEntity(VconnexEntity, SensorEntity):
                             else converter(param_value, self)
                         )
         except Exception:  # pylint: disable=broad-except
-            LOGGER.exception("Something went wrong!!!")
+            _LOGGER.exception("Something went wrong!!!")
 
         return None
-
-
-TargetEntity = VconnexSensorEntity
-
-
-async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
-) -> None:
-    """Async setup Home Assistant entry."""
-    vconnex_data: HomeAssistantVconnexData = hass.data[DOMAIN][entry.entry_id]
-    device_manager = vconnex_data.device_manager
-
-    @callback
-    def on_device_added(device_ids: list[str]) -> None:
-        """Device added callback."""
-        entities: list[Entity] = []
-        for device_id in device_ids:
-            device = device_manager.device_map[device_id]
-            for description_list_resolver in ENTITY_DESC_LIST_RESOLVER_LIST:
-                description_list = description_list_resolver.from_device(device)
-                if len(description_list) > 0:
-                    for description in description_list:
-                        entities.append(
-                            TargetEntity(
-                                vconnex_device=device,
-                                device_manager=device_manager,
-                                description=description,
-                            )
-                        )
-        async_add_entities(entities)
-
-    async_dispatcher_connect(hass, DispatcherSignal.DEVICE_ADDED, on_device_added)
-    on_device_added(device_ids=device_manager.device_map.keys())

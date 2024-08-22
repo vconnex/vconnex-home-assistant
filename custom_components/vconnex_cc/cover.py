@@ -2,174 +2,100 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import Any
 
 from vconnex.device import VconnexDevice, VconnexDeviceManager
 
 from homeassistant.components.cover import (
-    DEVICE_CLASS_CURTAIN,
+    CoverDeviceClass,
     CoverEntity,
     CoverEntityDescription,
+    CoverEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, CommandName, DispatcherSignal, ParamType
-from .entity import EntityDescListResolver, EntityDescResolver, VconnexEntity
+from .const import DOMAIN, CommandName, DispatcherSignal
+from .entity import VconnexEntity, VconnexParamDescription
 from .vconnex_wrap import HomeAssistantVconnexData
 
+_KEY__ENTITY_CONFIGS = "entity_configs"
+_KEY__ENTITY_DESC = "entity_desc"
+_KEY__DEVICE_CLASS = "device_class"
+_KEY__ENTITY_KEY = "key"
+_KEY__OPEN_PARAM_DESC = "open_param_desc"
+_KEY__STOP_PARAM_DESC = "stop_param_desc"
+_KEY__CLOSE_PARAM_DESC = "close_param_desc"
+_KEY__OPEN_LEVEL_PARAM_DESC = "open_level_param_desc"
 
-@dataclass
-class CoverEntityDescriptionExt(CoverEntityDescription):
-    """Cover entity info extend."""
-
-    index: int = 0
-    open_param: str = "curtain_open"
-    close_param: str = "curtain_close"
-    stop_param: str = "curtain_stop"
-    open_position_param: str = "open_level"
-
-    def __post_init__(self, **kwargs) -> None:
-        """Init after create object."""
-        if self.index != 0:
-            self.open_param = self.__param_with_index(self.open_param, self.index)
-            self.close_param = self.__param_with_index(self.close_param, self.index)
-            self.stop_param = self.__param_with_index(self.stop_param, self.index)
-            self.open_position_param = self.__param_with_index(
-                self.open_position_param, self.index
-            )
-
-    @staticmethod
-    def __param_with_index(param: str, index: int):
-        param_segment = param.split("_")
-        return f"{param_segment[0]}_{index}_{param_segment[1]}"
-
-
-DEVICE_ENTITY_MAP = {
-    3040: [
-        CoverEntityDescriptionExt(
-            key="cover", index=0, device_class=DEVICE_CLASS_CURTAIN
-        )
-    ],
-    3041: [
-        CoverEntityDescriptionExt(
-            key="cover_1", index=0, device_class=DEVICE_CLASS_CURTAIN
-        ),
-        CoverEntityDescriptionExt(
-            key="cover_2", index=2, device_class=DEVICE_CLASS_CURTAIN
-        ),
-    ],
-    3042: [
-        CoverEntityDescriptionExt(
-            key="curtain_motor", index=0, device_class=DEVICE_CLASS_CURTAIN
-        )
-    ],
+_ENTITY_CONFIG_MAP = {
+    3040: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__ENTITY_KEY: "cover_1",
+                    _KEY__DEVICE_CLASS: CoverDeviceClass.CURTAIN,
+                },
+                _KEY__OPEN_PARAM_DESC: VconnexParamDescription("curtain_open"),
+                _KEY__STOP_PARAM_DESC: VconnexParamDescription("curtain_stop"),
+                _KEY__CLOSE_PARAM_DESC: VconnexParamDescription("curtain_close"),
+                _KEY__OPEN_LEVEL_PARAM_DESC: VconnexParamDescription("open_level"),
+            },
+        ]
+    },
+    3041: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__ENTITY_KEY: "cover_1",
+                    _KEY__DEVICE_CLASS: CoverDeviceClass.CURTAIN,
+                },
+                _KEY__OPEN_PARAM_DESC: VconnexParamDescription("curtain_open"),
+                _KEY__CLOSE_PARAM_DESC: VconnexParamDescription("curtain_close"),
+                _KEY__OPEN_LEVEL_PARAM_DESC: VconnexParamDescription("open_level"),
+            },
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__ENTITY_KEY: "cover_2",
+                    _KEY__DEVICE_CLASS: CoverDeviceClass.CURTAIN,
+                },
+                _KEY__OPEN_PARAM_DESC: VconnexParamDescription("curtain_2_open"),
+                _KEY__CLOSE_PARAM_DESC: VconnexParamDescription("curtain_2_close"),
+                _KEY__OPEN_LEVEL_PARAM_DESC: VconnexParamDescription("open_2_level"),
+            },
+        ]
+    },
+    3042: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__ENTITY_KEY: "cover_motor",
+                    _KEY__DEVICE_CLASS: CoverDeviceClass.CURTAIN,
+                },
+                _KEY__OPEN_PARAM_DESC: VconnexParamDescription("curtain_open"),
+                _KEY__STOP_PARAM_DESC: VconnexParamDescription("curtain_stop"),
+                _KEY__CLOSE_PARAM_DESC: VconnexParamDescription("curtain_close"),
+                _KEY__OPEN_LEVEL_PARAM_DESC: VconnexParamDescription("open_level"),
+            }
+        ]
+    },
+    3048: {
+        _KEY__ENTITY_CONFIGS: [
+            {
+                _KEY__ENTITY_DESC: {
+                    _KEY__ENTITY_KEY: "cover_motor",
+                    _KEY__DEVICE_CLASS: CoverDeviceClass.CURTAIN,
+                },
+                _KEY__OPEN_PARAM_DESC: VconnexParamDescription("curtain_open"),
+                _KEY__STOP_PARAM_DESC: VconnexParamDescription("curtain_stop"),
+                _KEY__CLOSE_PARAM_DESC: VconnexParamDescription("curtain_close"),
+                _KEY__OPEN_LEVEL_PARAM_DESC: VconnexParamDescription("open_level"),
+            }
+        ]
+    },
 }
-
-
-class EntityDescListResolverExt(EntityDescListResolver):
-    """Entity Description List Resolver Extend."""
-
-    def from_device(self, device: VconnexDevice) -> list:
-        """Get entity description list from device."""
-        device_type_code = int(device.deviceTypeCode)
-        if device_type_code in self._accept_device_types:
-            if device is not None and device_type_code in DEVICE_ENTITY_MAP:
-                return DEVICE_ENTITY_MAP[device_type_code]
-        return []
-
-
-DEVICE_TYPE_SET: set[int] = set(DEVICE_ENTITY_MAP.keys())
-DEVICE_PARAM_TYPE_SET: set[int] = {ParamType.ON_OFF, ParamType.OPEN_CLOSE}
-ENTITY_DESC_RESOLVER = EntityDescResolver.of(CoverEntityDescriptionExt)
-
-ENTITY_DESC_LIST_RESOLVER_LIST = [
-    EntityDescListResolverExt(
-        DEVICE_TYPE_SET, DEVICE_PARAM_TYPE_SET, ENTITY_DESC_RESOLVER
-    )
-]
-
-
-class VconnexCoverEntity(VconnexEntity, CoverEntity):
-    """Vconnex Cover Device."""
-
-    def __init__(
-        self,
-        vconnex_device: VconnexDevice,
-        device_manager: VconnexDeviceManager,
-        description: CoverEntityDescriptionExt,
-    ) -> None:
-        """Create Vconnex Cover Entity object."""
-        super().__init__(
-            vconnex_device=vconnex_device,
-            device_manager=device_manager,
-            description=description,
-        )
-        self._attr_unique_id = f"{super().unique_id}.{description.key}"
-        self.entity_id = self._attr_unique_id
-        if description.index != 0 and self._attr_name is not None:
-            self._attr_name = f"{self._attr_name} {description.index}"
-
-    @property
-    def current_cover_position(self) -> int | None:
-        """Return current position of cover."""
-        return self.get_data(self.entity_description.open_position_param)
-
-    @property
-    def is_opening(self) -> bool | None:
-        """Return if the cover is opening or not."""
-        return self.get_data(
-            self.entity_description.open_param, lambda val, entity: int(val) != 0
-        )
-
-    @property
-    def is_closing(self) -> bool | None:
-        """Return if the cover is closing or not."""
-        return self.get_data(
-            self.entity_description.close_param, lambda val, entity: int(val) != 0
-        )
-
-    @property
-    def is_closed(self) -> bool | None:
-        """Return if the cover is closed or not."""
-        return (
-            position == 0
-            if (position := self.current_cover_position) is not None
-            else None
-        )
-
-    def open_cover(self, **kwargs):
-        """Open the cover."""
-        self._send_command(
-            CommandName.SET_DATA, {self.entity_description.open_param: 1}
-        )
-
-    def close_cover(self, **kwargs):
-        """Close cover."""
-        self._send_command(
-            CommandName.SET_DATA, {self.entity_description.close_param: 1}
-        )
-
-    def set_cover_position(self, **kwargs):
-        """Move the cover to a specific position."""
-        param_dict = dict(kwargs)
-        if "position" in param_dict:
-            self._send_command(
-                CommandName.SET_DATA,
-                {self.entity_description.open_position_param: param_dict["position"]},
-            )
-
-    def stop_cover(self, **kwargs):
-        """Stop the cover."""
-        self._send_command(
-            CommandName.SET_DATA, {self.entity_description.stop_param: 1}
-        )
-
-
-TargetEntity = VconnexCoverEntity
 
 
 async def async_setup_entry(
@@ -182,21 +108,139 @@ async def async_setup_entry(
     @callback
     def on_device_added(device_ids: list[str]) -> None:
         """Device added callback."""
-        entities: list[Entity] = []
+        entities: list[VconnexEntity] = []
         for device_id in device_ids:
-            device = device_manager.device_map[device_id]
-            for description_list_resolver in ENTITY_DESC_LIST_RESOLVER_LIST:
-                description_list = description_list_resolver.from_device(device)
-                if len(description_list) > 0:
-                    for description in description_list:
-                        entities.append(
-                            TargetEntity(
-                                vconnex_device=device,
-                                device_manager=device_manager,
-                                description=description,
-                            )
-                        )
-        async_add_entities(entities)
+            if (device := device_manager.get_device(device_id)) is not None:
+                if device.deviceTypeCode not in _ENTITY_CONFIG_MAP:
+                    continue
 
-    async_dispatcher_connect(hass, DispatcherSignal.DEVICE_ADDED, on_device_added)
+                entity_configs = list[dict[str, Any]](
+                    _ENTITY_CONFIG_MAP[device.deviceTypeCode].get(_KEY__ENTITY_CONFIGS)
+                )
+                for idx, entity_config in enumerate(entity_configs):
+                    open_param_desc: VconnexParamDescription = entity_config.get(
+                        _KEY__OPEN_PARAM_DESC, None
+                    )
+                    close_param_desc: VconnexParamDescription = entity_config.get(
+                        _KEY__CLOSE_PARAM_DESC, None
+                    )
+                    stop_param_desc: VconnexParamDescription = entity_config.get(
+                        _KEY__STOP_PARAM_DESC, None
+                    )
+                    open_level_param_desc: VconnexParamDescription = entity_config.get(
+                        _KEY__OPEN_LEVEL_PARAM_DESC, None
+                    )
+
+                    entity_desc_dict = entity_config.get(_KEY__ENTITY_DESC)
+                    entity_desc_dict["key"] = (
+                        f"{device.deviceId}.{entity_desc_dict[_KEY__ENTITY_KEY]}"
+                        if _KEY__ENTITY_KEY in entity_desc_dict
+                        else device.deviceId
+                    )
+                    entity_desc_dict["name"] = (
+                        f"{device.name} {idx + 1}"
+                        if len(entity_configs) > 1
+                        else device.name
+                    )
+
+                    entities.append(
+                        VconnexCoverEntity(
+                            vconnex_device=device,
+                            device_manager=device_manager,
+                            description=CoverEntityDescription(**entity_desc_dict),
+                            open_param_desc=open_param_desc,
+                            close_param_desc=close_param_desc,
+                            open_level_param_desc=open_level_param_desc,
+                            stop_param_desc=stop_param_desc,
+                        )
+                    )
+        if len(entities) > 0:
+            async_add_entities(entities)
+
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, DispatcherSignal.DEVICE_ADDED, on_device_added)
+    )
     on_device_added(device_ids=device_manager.device_map.keys())
+
+
+class VconnexCoverEntity(VconnexEntity, CoverEntity):
+    """Vconnex Cover Device."""
+
+    def __init__(
+        self,
+        vconnex_device: VconnexDevice,
+        device_manager: VconnexDeviceManager,
+        description: CoverEntityDescription,
+        open_param_desc: VconnexParamDescription,
+        close_param_desc: VconnexParamDescription,
+        open_level_param_desc: VconnexParamDescription,
+        stop_param_desc: VconnexParamDescription | None = None,
+    ) -> None:
+        """Create Vconnex Cover Entity object."""
+        super().__init__(
+            vconnex_device=vconnex_device,
+            device_manager=device_manager,
+            description=description,
+        )
+
+        self.open_param_desc = open_param_desc
+        self.stop_param_desc = stop_param_desc
+        self.close_param_desc = close_param_desc
+        self.open_level_param_desc = open_level_param_desc
+        self._attr_supported_features = (
+            CoverEntityFeature.OPEN
+            | CoverEntityFeature.CLOSE
+            | CoverEntityFeature.SET_POSITION
+        )
+        if stop_param_desc is not None:
+            self._attr_supported_features |= CoverEntityFeature.STOP
+
+    @property
+    def current_cover_position(self) -> int | None:
+        """Return current position of cover."""
+        return self.get_param_value(CommandName.GET_DATA, self.open_level_param_desc)
+
+    @property
+    def is_opening(self) -> bool | None:
+        """Return if the cover is opening or not."""
+        return self.get_param_value(CommandName.GET_DATA, self.open_param_desc) != 0
+
+    @property
+    def is_closing(self) -> bool | None:
+        """Return if the cover is closing or not."""
+        return self.get_param_value(CommandName.GET_DATA, self.close_param_desc) != 0
+
+    @property
+    def is_closed(self) -> bool | None:
+        """Return if the cover is closed or not."""
+        return (
+            position == 0
+            if (position := self.current_cover_position) is not None
+            else None
+        )
+
+    def open_cover(self, **kwargs: Any) -> None:
+        """Open the cover."""
+        self._send_command(CommandName.SET_DATA, {self.open_param_desc.native_param: 1})
+
+    def close_cover(self, **kwargs: Any) -> None:
+        """Close cover."""
+        self._send_command(
+            CommandName.SET_DATA, {self.close_param_desc.native_param: 1}
+        )
+
+    def set_cover_position(self, **kwargs: Any) -> None:
+        """Move the cover to a specific position."""
+        param_dict = dict(kwargs)
+        if "position" in param_dict:
+            self._send_command(
+                CommandName.SET_DATA,
+                {self.open_level_param_desc.native_param: param_dict["position"]},
+            )
+
+    def stop_cover(self, **kwargs: Any) -> None:
+        """Stop the cover."""
+        if self.stop_param_desc is not None:
+            self._send_command(
+                CommandName.SET_DATA, {self.stop_param_desc.native_param: 1}
+            )
