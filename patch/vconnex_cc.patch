@@ -31,4 +31,4 @@ index a71f12a..0e55cf9 100644
 +  "documentation": "https://github.com/vconnex/vconnex-home-assistant",
    "homekit": {},
    "iot_class": "cloud_push",
-   "requirements": ["vconnex.py==1.0.8"],
+   "requirements": ["vconnex.py==1.0.9"],
