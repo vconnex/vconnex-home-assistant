@@ -92,7 +92,7 @@ _ENTITY_CONFIG_MAP = {
             {
                 _KEY__ENTITY_DESC: {
                     _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
-                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
                     _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
                 },
                 _KEY__PARAM_DESC: VconnexParamDescription(
@@ -102,7 +102,7 @@ _ENTITY_CONFIG_MAP = {
             {
                 _KEY__ENTITY_DESC: {
                     _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
-                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
                     _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
                 },
                 _KEY__PARAM_DESC: VconnexParamDescription(
@@ -120,7 +120,7 @@ _ENTITY_CONFIG_MAP = {
             {
                 _KEY__ENTITY_DESC: {
                     _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
-                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
                     _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
                 },
                 _KEY__PARAM_DESC: VconnexParamDescription(
@@ -130,7 +130,7 @@ _ENTITY_CONFIG_MAP = {
             {
                 _KEY__ENTITY_DESC: {
                     _KEY__DEVICE_CLASS: SensorDeviceClass.ENERGY,
-                    _KEY__STATE_CLASS: SensorStateClass.MEASUREMENT,
+                    _KEY__STATE_CLASS: SensorStateClass.TOTAL_INCREASING,
                     _KEY__NATIVE_UNIT_OF_MEASUREMENT: UnitOfEnergy.KILO_WATT_HOUR,
                 },
                 _KEY__PARAM_DESC: VconnexParamDescription(
